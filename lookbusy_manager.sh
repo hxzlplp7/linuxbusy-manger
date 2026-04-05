@@ -152,8 +152,8 @@ install_lookbusy() {
     # 清理临时文件
     rm -rf "$TEMP_DIR"
 
-    # 设置快捷指令
-    set_shortcut
+    # 自动设置默认快捷指令 (lookbusy)
+    setup_default_shortcut
 }
 
 # 核心功能：检查快捷指令状态
@@ -174,7 +174,22 @@ check_shortcut_status() {
     fi
 }
 
-# 核心功能：设置快捷指令 (增强版)
+# 核心功能：安装后自动设置默认快捷指令 (无交互)
+setup_default_shortcut() {
+    # 自动固化脚本到系统路径
+    if [[ "$SCRIPT_PATH" != "$PERMANENT_PATH" ]]; then
+        cp -f "$SCRIPT_PATH" "$PERMANENT_PATH"
+        chmod +x "$PERMANENT_PATH"
+        SCRIPT_PATH="$PERMANENT_PATH"
+    fi
+
+    # 自动创建 lookbusy 快捷指令
+    ln -sf "$SCRIPT_PATH" "/usr/local/bin/lookbusy"
+    chmod +x "/usr/local/bin/lookbusy"
+    echo -e "${GREEN}✔ 快捷指令已自动设置！以后输入 'lookbusy' 即可打开管理菜单。${NC}"
+}
+
+# 核心功能：设置快捷指令 (增强版/手动)
 set_shortcut() {
     echo -e "\n${BLUE}--- 设置/加固 快捷启动指令 ---${NC}"
     
