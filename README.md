@@ -24,15 +24,15 @@
 
 ## 🚀 快速上手
 
-### 1. 一键安装命令 (推荐)
+### 1. 一键安装并交互式配置 (推荐)
 
-如果您想快速安装并启动默认负载（CPU 20%, 内存 1GB），可以直接在终端执行：
+如果您想快速安装并手动根据系统资源进行设置，请执行：
 
 ```bash
-wget -O lookbusy_manager.sh https://raw.githubusercontent.com/hxzlplp7/linuxbusy-manger/main/lookbusy_manager.sh && chmod +x lookbusy_manager.sh && sudo ./lookbusy_manager.sh install && sudo ./lookbusy_manager.sh start 20 1024MB
+wget -O lookbusy_manager.sh https://raw.githubusercontent.com/hxzlplp7/linuxbusy-manger/main/lookbusy_manager.sh && chmod +x lookbusy_manager.sh && sudo ./lookbusy_manager.sh install && sudo ./lookbusy_manager.sh start
 ```
 
-*(注：已去掉静默模式 `-q`，下载时将显示进度和报错信息，方便排查问题。)*
+*(注：运行 `start` 后，脚本会实时显示您的 CPU 核心数和剩余可用内存，并引导您输入合适的占用值，防止系统崩溃。)*
 
 ### 2. 手动运行脚本
 

@@ -68,6 +68,18 @@ is_running() {
     fi
 }
 
+# 核心功能：获取系统资源信息
+get_system_info() {
+    CPU_CORES=$(nproc)
+    MEM_TOTAL=$(free -m | awk '/^Mem:/ {print $2}')
+    MEM_FREE=$(free -m | awk '/^Mem:/ {print $7}')
+    echo -e "${BLUE}--- 系统当前资源状态 ---${NC}"
+    echo -e "CPU 核心总数: ${YELLOW}${CPU_CORES}${NC} 核"
+    echo -e "总内存容量  : ${YELLOW}${MEM_TOTAL}${NC} MB"
+    echo -e "当前可用内存: ${YELLOW}${MEM_FREE}${NC} MB"
+    echo -e "${BLUE}------------------------${NC}"
+}
+
 # 菜单：安装 lookbusy
 install_lookbusy() {
     if is_installed; then
@@ -114,12 +126,28 @@ manage_service() {
     local mem_val=$2
 
     if [[ -z "$cpu_val" || -z "$mem_val" ]]; then
-        echo -e "${YELLOW}--- 配置负载参数 ---${NC}"
-        read -p "请输入 CPU 使用率 (0-100，建议 20): " cpu_val
-        cpu_val=${cpu_val:-20}
+        get_system_info
+        echo -e "${YELLOW}提示：建议设置 CPU 占用率在 15-25% 之间。${NC}"
+        echo -e "${YELLOW}提示：内存设置【严禁超过】当前可用内存 (${MEM_FREE}MB)。${NC}"
         
-        read -p "请输入内存占用大小 (例如 5120MB 或 1G): " mem_val
-        mem_val=${mem_val:-5120MB}
+        while true; do
+            read -p "请输入欲占用的 CPU 使用率 (0-100): " cpu_val
+            if [[ "$cpu_val" =~ ^[0-9]+$ ]] && [ "$cpu_val" -le 100 ]; then break; fi
+            echo -e "${RED}输入错误，请输入 0 到 100 之间的数字。${NC}"
+        done
+
+        while true; do
+            read -p "请输入欲占用的内存大小 (例如 200MB 或 1G): " mem_val
+            # 基础校验：如果是以 MB 结尾，检查数值是否超过可用内存
+            if [[ "$mem_val" =~ ^([0-9]+)MB$ ]]; then
+                val=${BASH_REMATCH[1]}
+                if [ "$val" -ge "$MEM_FREE" ]; then
+                    echo -e "${RED}警告：设置值 ($val MB) 超过可用内存 ($MEM_FREE MB)，会导致服务启动失败！${NC}"
+                    continue
+                fi
+            fi
+            if [[ -n "$mem_val" ]]; then break; fi
+        done
     fi
 
     echo -e "${BLUE}正在创建/更新 systemd 服务...${NC}"
