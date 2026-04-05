@@ -121,39 +121,70 @@ install_lookbusy() {
         return
     fi
 
-    echo -e "${BLUE}开始安装依赖 (curl, build-essential)...${NC}"
-    apt -y update && apt -y install curl build-essential
+    echo -e "${BLUE}正在检测系统架构...${NC}"
+    local ARCH=$(uname -m)
+    local BIN_URL=""
+    case "$ARCH" in
+        x86_64|amd64)  BIN_URL="https://raw.githubusercontent.com/hxzlplp7/linuxbusy-manger/main/bin/lookbusy-amd64" ;;
+        aarch64|arm64) BIN_URL="https://raw.githubusercontent.com/hxzlplp7/linuxbusy-manger/main/bin/lookbusy-arm64" ;;
+    esac
 
-    echo -e "${BLUE}正在下载 lookbusy 源码...${NC}"
-    mkdir -p "$TEMP_DIR"
-    curl -L "$SRC_URL" -o "$TEMP_DIR/lookbusy-1.4.tar.gz"
-    
-    if [[ ! -f "$TEMP_DIR/lookbusy-1.4.tar.gz" ]]; then
-        echo -e "${RED}下载失败，请检查网络！${NC}"
-        return
+    local install_ok=false
+
+    # 方法一：直接下载预编译二进制文件 (推荐，无需编译环境)
+    if [[ -n "$BIN_URL" ]]; then
+        echo -e "${BLUE}尝试下载预编译二进制文件 ($ARCH)...${NC}"
+        if curl -fsSL "$BIN_URL" -o "$BINARY_PATH"; then
+            chmod +x "$BINARY_PATH"
+            if [[ -x "$BINARY_PATH" ]]; then
+                install_ok=true
+                echo -e "${GREEN}✔ lookbusy 预编译版安装成功！(无需编译)${NC}"
+            fi
+        else
+            echo -e "${YELLOW}预编译文件下载失败，将回退到源码编译...${NC}"
+        fi
     fi
 
-    echo -e "${BLUE}开始解压并编译...${NC}"
-    cd "$TEMP_DIR" || exit
-    tar -xzvf lookbusy-1.4.tar.gz
-    cd lookbusy-1.4/ || exit
-    ./configure && make && make install
+    # 方法二：源码编译安装 (回退方案)
+    if [[ "$install_ok" != true ]]; then
+        echo -e "${BLUE}开始安装编译依赖 (curl, build-essential)...${NC}"
+        apt -y update && apt -y install curl build-essential
 
-    if is_installed; then
-        echo -e "${GREEN}✔ lookbusy 工具已就绪！${NC}"
-        # 核心逻辑：如果存在旧的二进制同名文件，自动重命名避让
+        echo -e "${BLUE}正在下载 lookbusy 源码...${NC}"
+        mkdir -p "$TEMP_DIR"
+        curl -L "$SRC_URL" -o "$TEMP_DIR/lookbusy-1.4.tar.gz"
+
+        if [[ ! -f "$TEMP_DIR/lookbusy-1.4.tar.gz" ]]; then
+            echo -e "${RED}下载失败，请检查网络！${NC}"
+            return
+        fi
+
+        echo -e "${BLUE}开始解压并编译...${NC}"
+        cd "$TEMP_DIR" || exit
+        tar -xzvf lookbusy-1.4.tar.gz
+        cd lookbusy-1.4/ || exit
+        ./configure && make && make install
+
+        # 关键修复：先重命名再检测（make install 输出到 /usr/local/bin/lookbusy）
         if [[ -f "/usr/local/bin/lookbusy" && ! -L "/usr/local/bin/lookbusy" ]]; then
             mv -f "/usr/local/bin/lookbusy" "$BINARY_PATH"
         fi
-    else
-        echo -e "${RED}❌ 安装失败，请检查编译输出。${NC}"
+
+        if is_installed; then
+            install_ok=true
+            echo -e "${GREEN}✔ lookbusy 源码编译安装成功！${NC}"
+        else
+            echo -e "${RED}❌ 安装失败，请检查编译输出。${NC}"
+        fi
+
+        # 清理临时文件
+        rm -rf "$TEMP_DIR"
     fi
 
-    # 清理临时文件
-    rm -rf "$TEMP_DIR"
-
-    # 自动设置默认快捷指令 (lookbusy)
-    setup_default_shortcut
+    # 安装成功后自动设置默认快捷指令
+    if [[ "$install_ok" == true ]]; then
+        setup_default_shortcut
+    fi
 }
 
 # 核心功能：检查快捷指令状态
