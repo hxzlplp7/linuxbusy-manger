@@ -7,6 +7,7 @@
 ## 📖 教程背景
 
 根据甲骨文最新的服务手册，免费实例若满足以下任意条件，可能会被回收：
+
 - 95% 时间的 CPU 使用率小于 10%
 - 网络利用率不足 10%
 - 内存利用率不足 10% (仅适用于 ARM 实例)
@@ -23,12 +24,17 @@
 
 ## 🚀 快速上手
 
-### 1. 环境准备
-建议在 **Debian 11+** 或 **Ubuntu 20.04+** 系统上运行（脚本自带依赖安装功能）。
+### 1. 一键安装命令 (推荐)
+如果您想快速安装并启动默认负载（CPU 20%, 内存 5GB），可以直接在终端执行：
 
-### 2. 获取并运行
+```bash
+wget -qO lookbusy_manager.sh https://raw.githubusercontent.com/jcnf/lookbusy/main/lookbusy_manager.sh && chmod +x lookbusy_manager.sh && sudo ./lookbusy_manager.sh install && sudo ./lookbusy_manager.sh start 20 5120MB
+```
+*(注：请将 URL 替换为您实际存放脚本的地址)*
 
-将 `lookbusy_manager.sh` 上传至您的 VPS 或直接在服务器上执行：
+### 2. 手动运行脚本
+
+如果您已下载脚本，可以直接运行进入交互菜单：
 
 ```bash
 # 赋予执行权限
@@ -38,7 +44,17 @@ chmod +x lookbusy_manager.sh
 sudo ./lookbusy_manager.sh
 ```
 
-### 3. 操作建议
+### 3. 命令行参数 (非交互模式)
+
+脚本支持带参数直接运行，适合脚本自动化调用：
+
+- **安装**：`sudo ./lookbusy_manager.sh install`
+- **启动/更新负载**：`sudo ./lookbusy_manager.sh start [CPU%] [内存大小]`
+  - 例如：`sudo ./lookbusy_manager.sh start 15 2G`
+- **停止**：`sudo ./lookbusy_manager.sh stop`
+- **卸载**：`sudo ./lookbusy_manager.sh uninstall`
+
+### 4. 操作建议
 
 - **CPU 占用**：建议设置在 `15% - 25%` 之间。
 - **内存占用**：ARM 机器建议至少占用 `10% - 15%`。

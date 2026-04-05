@@ -25,6 +25,31 @@ if [[ $EUID -ne 0 ]]; then
    exit 1
 fi
 
+# 参数处理 (辅助一键安装)
+handle_args() {
+    case $1 in
+        1|install)
+            install_lookbusy
+            ;;
+        2|start)
+            # 允许直接带参数运行，例如: ./script.sh start 20 1G
+            manage_service "$2" "$3"
+            ;;
+        3|stop)
+            stop_service
+            ;;
+        5|uninstall)
+            uninstall_lookbusy_auto
+            ;;
+        *)
+            echo -e "${RED}未知参数: $1${NC}"
+            echo -e "可用参数: install, start, stop, uninstall"
+            exit 1
+            ;;
+    esac
+    exit 0
+}
+
 # 核心功能：检查是否安装
 is_installed() {
     if [[ -f "$BINARY_PATH" ]]; then
@@ -81,16 +106,21 @@ install_lookbusy() {
 # 菜单：启动/更新服务
 manage_service() {
     if ! is_installed; then
-        echo -e "${RED}错误：未发现 lookbusy 进程，请先选择选项 1 进安装。${NC}"
+        echo -e "${RED}错误：未发现 lookbusy 进程，请先进行安装。${NC}"
         return
     fi
 
-    echo -e "${YELLOW}--- 配置负载参数 ---${NC}"
-    read -p "请输入 CPU 使用率 (0-100，建议 20): " cpu_val
-    cpu_val=${cpu_val:-20}
-    
-    read -p "请输入内存占用大小 (例如 5120MB 或 1G): " mem_val
-    mem_val=${mem_val:-5120MB}
+    local cpu_val=$1
+    local mem_val=$2
+
+    if [[ -z "$cpu_val" || -z "$mem_val" ]]; then
+        echo -e "${YELLOW}--- 配置负载参数 ---${NC}"
+        read -p "请输入 CPU 使用率 (0-100，建议 20): " cpu_val
+        cpu_val=${cpu_val:-20}
+        
+        read -p "请输入内存占用大小 (例如 5120MB 或 1G): " mem_val
+        mem_val=${mem_val:-5120MB}
+    fi
 
     echo -e "${BLUE}正在创建/更新 systemd 服务...${NC}"
     cat <<EOF > "$SERVICE_PATH"
@@ -130,12 +160,16 @@ stop_service() {
     echo -e "${GREEN}✔ 负载服务已停止并禁用自启。${NC}"
 }
 
-# 菜单：卸载
+# 菜单：卸载 (交互式)
 uninstall_lookbusy() {
     echo -e "${YELLOW}警告：这将彻底卸载 lookbusy 及其配置！${NC}"
     read -p "确定继续吗？(y/n): " confirm
     if [[ "$confirm" != "y" ]]; then return; fi
+    uninstall_lookbusy_auto
+}
 
+# 自动化卸载 (非交互)
+uninstall_lookbusy_auto() {
     stop_service
     rm -f "$SERVICE_PATH"
     rm -f "$BINARY_PATH"
@@ -162,6 +196,11 @@ show_status() {
     sleep 2
     top -d 2
 }
+
+# 如果有命令行参数，则直接处理
+if [[ -n "$1" ]]; then
+    handle_args "$@"
+fi
 
 # 主循环
 while true; do
