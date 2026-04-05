@@ -29,10 +29,10 @@
 如果您想快速安装并启动默认负载（CPU 20%, 内存 1GB），可以直接在终端执行：
 
 ```bash
-wget -qO lookbusy_manager.sh https://raw.githubusercontent.com/hxzlplp7/lookbusy/main/lookbusy_manager.sh && chmod +x lookbusy_manager.sh && sudo ./lookbusy_manager.sh install && sudo ./lookbusy_manager.sh start 20 1024MB
+wget -O lookbusy_manager.sh https://raw.githubusercontent.com/hxzlplp7/lookbusy/main/lookbusy_manager.sh && chmod +x lookbusy_manager.sh && sudo ./lookbusy_manager.sh install && sudo ./lookbusy_manager.sh start 20 1024MB
 ```
 
-*(注：请将 URL 替换为您实际存放脚本的地址)*
+*(注：已去掉静默模式 `-q`，下载时将显示进度和报错信息，方便排查问题。)*
 
 ### 2. 手动运行脚本
 
