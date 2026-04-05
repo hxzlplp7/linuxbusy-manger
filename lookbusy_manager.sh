@@ -19,6 +19,7 @@ BINARY_PATH="/usr/local/bin/lookbusy"
 SRC_URL="http://www.devin.com/lookbusy/download/lookbusy-1.4.tar.gz"
 TEMP_DIR="/tmp/lookbusy_install"
 SCRIPT_PATH=$(readlink -f "$0")
+PERMANENT_PATH="/usr/local/bin/lookbusy-manager"
 
 # 权限检查
 if [[ $EUID -ne 0 ]]; then
@@ -151,27 +152,70 @@ install_lookbusy() {
     set_shortcut
 }
 
-# 核心功能：设置快捷指令
-set_shortcut() {
-    echo -e "\n${BLUE}--- 设置快捷启动指令 ---${NC}"
-    echo -e "你可以设置一个简短的命令（如 lb）来快速呼出此菜单。"
+# 核心功能：检查快捷指令状态
+check_shortcut_status() {
+    local found=""
+    # 遍历常用二进制目录寻找指向此脚本的链接
+    for cmd in /usr/local/bin/* /usr/bin/*; do
+        if [[ -L "$cmd" && "$(readlink -f "$cmd")" == "$SCRIPT_PATH" ]]; then
+            found=$(basename "$cmd")
+            break
+        fi
+    done
     
-    read -p "是否设置快捷启动指令？(y/n, 默认y): " set_confirm
-    set_confirm=${set_confirm:-y}
-    if [[ "$set_confirm" != "y" ]]; then return; fi
+    if [[ -n "$found" ]]; then
+        echo -e "快捷指令状态: ${GREEN}已设置 ($found)${NC}"
+    else
+        echo -e "快捷指令状态: ${RED}未设置${NC}"
+    fi
+}
 
-    read -p "请输入快捷指令名称 (建议使用 lb): " cmd_name
+# 核心功能：设置快捷指令 (增强版)
+set_shortcut() {
+    echo -e "\n${BLUE}--- 设置/加固 快捷启动指令 ---${NC}"
+    
+    # 1. 询问是否固化脚本位置
+    if [[ "$SCRIPT_PATH" != "$PERMANENT_PATH" ]]; then
+        echo -e "${YELLOW}提示：将脚本移动到系统目录可防止因原始目录删除而导致快捷指令失效。${NC}"
+        read -p "是否将脚本固化到 $PERMANENT_PATH？(y/n, 默认y): " move_confirm
+        move_confirm=${move_confirm:-y}
+        if [[ "$move_confirm" == "y" ]]; then
+            cp -f "$SCRIPT_PATH" "$PERMANENT_PATH"
+            chmod +x "$PERMANENT_PATH"
+            SCRIPT_PATH="$PERMANENT_PATH"
+            echo -e "${GREEN}✔ 脚本已加固。${NC}"
+        fi
+    fi
+
+    # 2. 设置软链接
+    read -p "请输入欲使用的快捷指令名称 (建议 lb 或 lookbusy): " cmd_name
     cmd_name=${cmd_name:-lb}
     local target_path="/usr/local/bin/$cmd_name"
 
-    if [[ -f "$target_path" && ! -L "$target_path" ]]; then
-        echo -e "${RED}警告：$target_path 已存在且不是软链接，为安全起见跳过设置。${NC}"
-        return
+    # 3. 冲突检测 (核心：处理 lb 冲突)
+    if command -v "$cmd_name" > /dev/null; then
+        local existing_path=$(which "$cmd_name")
+        if [[ "$existing_path" != "$target_path" ]]; then
+            echo -e "${RED}警告：系统已存在同名命令 '$cmd_name'！${NC}"
+            echo -e "${RED}路径: $existing_path${NC}"
+            read -p "是否强制覆盖（可能影响系统其他软件）？(y/n): " force_confirm
+            if [[ "$force_confirm" != "y" ]]; then 
+                echo -e "${YELLOW}取消设置，建议换个名字（如 lbz）。${NC}"
+                return 
+            fi
+        fi
     fi
 
     ln -sf "$SCRIPT_PATH" "$target_path"
     chmod +x "$target_path"
-    echo -e "${GREEN}✔ 快捷指令 '$cmd_name' 设置成功！以后在任何地方输入 '$cmd_name' 即可打开管理菜单。${NC}"
+    
+    # 4. 验证
+    if command -v "$cmd_name" > /dev/null; then
+        echo -e "${GREEN}✔ 快捷指令 '$cmd_name' 设置成功！${NC}"
+        echo -e "以后只需输入 ${YELLOW}$cmd_name${NC} 即可快速管理负载。"
+    else
+        echo -e "${RED}❌ 设置失败，请检查 /usr/local/bin 是否在 PATH 中。${NC}"
+    fi
 }
 
 # 菜单：启动/更新服务
@@ -262,13 +306,19 @@ uninstall_lookbusy_auto() {
     rm -f "$SERVICE_PATH"
     rm -f "$BINARY_PATH"
     
-    # 清理快捷指令 (查找指向此脚本的软链接)
-    for cmd in /usr/local/bin/*; do
-        if [[ -L "$cmd" && "$(readlink -f "$cmd")" == "$SCRIPT_PATH" ]]; then
-            rm -f "$cmd"
-            echo -e "${GREEN}✔ 已移除快捷指令: $(basename "$cmd")${NC}"
+    # 清理快捷指令 (查找指向此脚本或固化路径的软链接)
+    for cmd in /usr/local/bin/* /usr/bin/*; do
+        if [[ -L "$cmd" ]]; then
+            local link_target=$(readlink -f "$cmd")
+            if [[ "$link_target" == "$SCRIPT_PATH" || "$link_target" == "$PERMANENT_PATH" ]]; then
+                rm -f "$cmd"
+                echo -e "${GREEN}✔ 已移除快捷指令: $(basename "$cmd")${NC}"
+            fi
         fi
     done
+
+    # 清理固化脚本
+    [[ -f "$PERMANENT_PATH" ]] && rm -f "$PERMANENT_PATH"
 
     systemctl daemon-reload
     echo -e "${GREEN}✔ 卸载完成。${NC}"
@@ -304,6 +354,7 @@ while true; do
     echo -e "\n${BLUE}========================================${NC}"
     echo -e "${BLUE}      Lookbusy VPS 管理菜单 (V1.0)      ${NC}"
     echo -e "${BLUE}========================================${NC}"
+    check_shortcut_status
     get_current_usage
     echo -e "1) ${GREEN}安装 lookbusy${NC} (仅需运行一次)"
     echo -e "2) ${YELLOW}启动/更新 负载配置${NC} (设置 CPU/内存)"
