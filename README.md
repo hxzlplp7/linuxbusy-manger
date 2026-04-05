@@ -25,11 +25,13 @@
 ## 🚀 快速上手
 
 ### 1. 一键安装命令 (推荐)
-如果您想快速安装并启动默认负载（CPU 20%, 内存 5GB），可以直接在终端执行：
+
+如果您想快速安装并启动默认负载（CPU 20%, 内存 1GB），可以直接在终端执行：
 
 ```bash
-wget -qO lookbusy_manager.sh https://raw.githubusercontent.com/jcnf/lookbusy/main/lookbusy_manager.sh && chmod +x lookbusy_manager.sh && sudo ./lookbusy_manager.sh install && sudo ./lookbusy_manager.sh start 20 5120MB
+wget -qO lookbusy_manager.sh https://raw.githubusercontent.com/hxzlplp7/lookbusy/main/lookbusy_manager.sh && chmod +x lookbusy_manager.sh && sudo ./lookbusy_manager.sh install && sudo ./lookbusy_manager.sh start 20 1024MB
 ```
+
 *(注：请将 URL 替换为您实际存放脚本的地址)*
 
 ### 2. 手动运行脚本
@@ -66,7 +68,7 @@ sudo ./lookbusy_manager.sh
 
 ```text
 ========================================
-      Lookbusy VPS 管理菜单 (V1.0)      
+      Lookbusy VPS 管理菜单 (V1.0)    
 ========================================
 1) 安装 lookbusy (仅需运行一次)
 2) 启动/更新 负载配置 (设置 CPU/内存)
