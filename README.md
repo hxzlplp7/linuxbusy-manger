@@ -73,4 +73,3 @@ sudo ./lookbusy_manager.sh
 - 工具作者：[Devin Carraway (lookbusy)](http://www.devin.com/lookbusy/)
 
 ---
-*Created with ❤️ by Antigravity*
