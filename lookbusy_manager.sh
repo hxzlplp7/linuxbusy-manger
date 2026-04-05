@@ -18,6 +18,7 @@ SERVICE_PATH="/etc/systemd/system/lookbusy.service"
 BINARY_PATH="/usr/local/bin/lookbusy"
 SRC_URL="http://www.devin.com/lookbusy/download/lookbusy-1.4.tar.gz"
 TEMP_DIR="/tmp/lookbusy_install"
+SCRIPT_PATH=$(readlink -f "$0")
 
 # 权限检查
 if [[ $EUID -ne 0 ]]; then
@@ -68,16 +69,48 @@ is_running() {
     fi
 }
 
-# 核心功能：获取系统资源信息
+# 核心功能：获取系统资源静态信息
 get_system_info() {
     CPU_CORES=$(nproc)
     MEM_TOTAL=$(free -m | awk '/^Mem:/ {print $2}')
     MEM_FREE=$(free -m | awk '/^Mem:/ {print $7}')
-    echo -e "${BLUE}--- 系统当前资源状态 ---${NC}"
+    echo -e "${BLUE}--- 系统静态资源概览 ---${NC}"
     echo -e "CPU 核心总数: ${YELLOW}${CPU_CORES}${NC} 核"
     echo -e "总内存容量  : ${YELLOW}${MEM_TOTAL}${NC} MB"
-    echo -e "当前可用内存: ${YELLOW}${MEM_FREE}${NC} MB"
+    echo -e "当前空闲内存: ${YELLOW}${MEM_FREE}${NC} MB"
     echo -e "${BLUE}------------------------${NC}"
+}
+
+# 核心功能：获取当前负载动态指标
+get_current_usage() {
+    # CPU 占用率通过 top 快照计算 (Debian/Ubuntu 兼容)
+    CPU_USAGE=$(top -bn1 | grep "Cpu(s)" | awk '{print $2+$4+$6}')
+    # 如果 top 输出格式有差异导致无法获取，则设置默认值
+    if [[ -z "$CPU_USAGE" ]]; then CPU_USAGE="0.0"; fi
+    
+    # 内存占用百分比
+    MEM_USAGE=$(free | grep Mem | awk '{printf "%.1f", $3/$2 * 100}')
+    
+    # 状态条渲染
+    echo -n -e "当前系统占用:  "
+    
+    # CPU 色彩指示
+    if (( $(echo "$CPU_USAGE < 30" | bc -l 2>/dev/null || [ "${CPU_USAGE%.*}" -lt 30 ] ) )); then
+        echo -n -e "CPU: ${GREEN}${CPU_USAGE}%${NC} | "
+    elif (( $(echo "$CPU_USAGE < 70" | bc -l 2>/dev/null || [ "${CPU_USAGE%.*}" -lt 70 ] ) )); then
+        echo -n -e "CPU: ${YELLOW}${CPU_USAGE}%${NC} | "
+    else
+        echo -n -e "CPU: ${RED}${CPU_USAGE}%${NC} | "
+    fi
+    
+    # 内存色彩指示
+    if (( $(echo "$MEM_USAGE < 50" | bc -l 2>/dev/null || [ "${MEM_USAGE%.*}" -lt 50 ] ) )); then
+        echo -e "MEM: ${GREEN}${MEM_USAGE}%${NC}"
+    elif (( $(echo "$MEM_USAGE < 85" | bc -l 2>/dev/null || [ "${MEM_USAGE%.*}" -lt 85 ] ) )); then
+        echo -e "MEM: ${YELLOW}${MEM_USAGE}%${NC}"
+    else
+        echo -e "MEM: ${RED}${MEM_USAGE}%${NC}"
+    fi
 }
 
 # 菜单：安装 lookbusy
@@ -113,6 +146,32 @@ install_lookbusy() {
 
     # 清理临时文件
     rm -rf "$TEMP_DIR"
+
+    # 设置快捷指令
+    set_shortcut
+}
+
+# 核心功能：设置快捷指令
+set_shortcut() {
+    echo -e "\n${BLUE}--- 设置快捷启动指令 ---${NC}"
+    echo -e "你可以设置一个简短的命令（如 lb）来快速呼出此菜单。"
+    
+    read -p "是否设置快捷启动指令？(y/n, 默认y): " set_confirm
+    set_confirm=${set_confirm:-y}
+    if [[ "$set_confirm" != "y" ]]; then return; fi
+
+    read -p "请输入快捷指令名称 (建议使用 lb): " cmd_name
+    cmd_name=${cmd_name:-lb}
+    local target_path="/usr/local/bin/$cmd_name"
+
+    if [[ -f "$target_path" && ! -L "$target_path" ]]; then
+        echo -e "${RED}警告：$target_path 已存在且不是软链接，为安全起见跳过设置。${NC}"
+        return
+    fi
+
+    ln -sf "$SCRIPT_PATH" "$target_path"
+    chmod +x "$target_path"
+    echo -e "${GREEN}✔ 快捷指令 '$cmd_name' 设置成功！以后在任何地方输入 '$cmd_name' 即可打开管理菜单。${NC}"
 }
 
 # 菜单：启动/更新服务
@@ -127,7 +186,8 @@ manage_service() {
 
     if [[ -z "$cpu_val" || -z "$mem_val" ]]; then
         get_system_info
-        echo -e "${YELLOW}提示：建议设置 CPU 占用率在 15-25% 之间。${NC}"
+        get_current_usage
+        echo -e "\n${YELLOW}提示：建议设置 CPU 占用率在 15-25% 之间。${NC}"
         echo -e "${YELLOW}提示：内存设置【严禁超过】当前可用内存 (${MEM_FREE}MB)。${NC}"
         
         while true; do
@@ -201,6 +261,15 @@ uninstall_lookbusy_auto() {
     stop_service
     rm -f "$SERVICE_PATH"
     rm -f "$BINARY_PATH"
+    
+    # 清理快捷指令 (查找指向此脚本的软链接)
+    for cmd in /usr/local/bin/*; do
+        if [[ -L "$cmd" && "$(readlink -f "$cmd")" == "$SCRIPT_PATH" ]]; then
+            rm -f "$cmd"
+            echo -e "${GREEN}✔ 已移除快捷指令: $(basename "$cmd")${NC}"
+        fi
+    done
+
     systemctl daemon-reload
     echo -e "${GREEN}✔ 卸载完成。${NC}"
 }
@@ -235,14 +304,16 @@ while true; do
     echo -e "\n${BLUE}========================================${NC}"
     echo -e "${BLUE}      Lookbusy VPS 管理菜单 (V1.0)      ${NC}"
     echo -e "${BLUE}========================================${NC}"
+    get_current_usage
     echo -e "1) ${GREEN}安装 lookbusy${NC} (仅需运行一次)"
     echo -e "2) ${YELLOW}启动/更新 负载配置${NC} (设置 CPU/内存)"
     echo -e "3) ${RED}停止 负载服务${NC}"
     echo -e "4) 查看状态 & 实时监控"
     echo -e "5) 彻底卸载"
+    echo -e "6) ${BLUE}设置/修改 快捷启动指令${NC}"
     echo -e "0) 退出"
     echo -e "${BLUE}========================================${NC}"
-    read -p "请选择操作 [0-5]: " choice
+    read -p "请选择操作 [0-6]: " choice
 
     case $choice in
         1) install_lookbusy ;;
@@ -250,6 +321,7 @@ while true; do
         3) stop_service ;;
         4) show_status ;;
         5) uninstall_lookbusy ;;
+        6) set_shortcut ;;
         0) echo "退出脚本。"; exit 0 ;;
         *) echo -e "${RED}输入无效，请重新选择。${NC}" ;;
     esac
