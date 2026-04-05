@@ -15,7 +15,7 @@ NC='\033[0m'
 
 # 变量定义
 SERVICE_PATH="/etc/systemd/system/lookbusy.service"
-BINARY_PATH="/usr/local/bin/lookbusy"
+BINARY_PATH="/usr/local/bin/lookbusy-bin"
 SRC_URL="http://www.devin.com/lookbusy/download/lookbusy-1.4.tar.gz"
 TEMP_DIR="/tmp/lookbusy_install"
 SCRIPT_PATH=$(readlink -f "$0")
@@ -140,7 +140,11 @@ install_lookbusy() {
     ./configure && make && make install
 
     if is_installed; then
-        echo -e "${GREEN}✔ lookbusy 安装成功！${NC}"
+        echo -e "${GREEN}✔ lookbusy 工具已就绪！${NC}"
+        # 核心逻辑：如果存在旧的二进制同名文件，自动重命名避让
+        if [[ -f "/usr/local/bin/lookbusy" && ! -L "/usr/local/bin/lookbusy" ]]; then
+            mv -f "/usr/local/bin/lookbusy" "$BINARY_PATH"
+        fi
     else
         echo -e "${RED}❌ 安装失败，请检查编译输出。${NC}"
     fi
@@ -188,8 +192,8 @@ set_shortcut() {
     fi
 
     # 2. 设置软链接
-    read -p "请输入欲使用的快捷指令名称 (建议 lb 或 lookbusy): " cmd_name
-    cmd_name=${cmd_name:-lb}
+    read -p "请输入欲使用的快捷指令名称 (建议直接输入 lookbusy): " cmd_name
+    cmd_name=${cmd_name:-lookbusy}
     local target_path="/usr/local/bin/$cmd_name"
 
     # 3. 冲突检测 (核心：处理 lb 冲突)
